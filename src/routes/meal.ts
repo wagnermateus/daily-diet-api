@@ -74,24 +74,69 @@ export async function mealRoute(app: FastifyInstance) {
     }
   );
 
-  app.delete("/:id", async (request, reply) => {
-    let session_id = request.cookies.sessionId;
+  app.delete(
+    "/:id",
+    { preHandler: [checkSessionIdExists] },
+    async (request, reply) => {
+      let session_id = request.cookies.sessionId;
 
-    const userId = await knex("user")
-      .select("id")
-      .where("session_id", session_id)
-      .first();
+      const userId = await knex("user")
+        .select("id")
+        .where("session_id", session_id)
+        .first();
 
-    const getMealParamsSchema = z.object({
-      id: z.string().uuid(),
-    });
+      const deleteMealParamsSchema = z.object({
+        id: z.string().uuid(),
+      });
 
-    const { id } = getMealParamsSchema.parse(request.params);
-    await knex("meal").delete("*").where({
-      user_id: userId.id,
-      id,
-    });
+      const { id } = deleteMealParamsSchema.parse(request.params);
+      await knex("meal").delete("*").where({
+        user_id: userId.id,
+        id,
+      });
 
-    return reply.status(201).send();
-  });
+      return reply.status(201).send();
+    }
+  );
+
+  app.put(
+    "/:id",
+    { preHandler: [checkSessionIdExists] },
+    async (request, reply) => {
+      const createMealBodySchema = z.object({
+        name: z.string(),
+        description: z.string(),
+        date_hour: z.string().datetime(),
+        is_on_the_diet: z.boolean(),
+      });
+
+      let session_id = request.cookies.sessionId;
+
+      const userId = await knex("user")
+        .select("id")
+        .where("session_id", session_id)
+        .first();
+
+      const { name, date_hour, description, is_on_the_diet } =
+        createMealBodySchema.parse(request.body);
+
+      const updateMealParamsSchema = z.object({
+        id: z.string().uuid(),
+      });
+
+      const { id } = updateMealParamsSchema.parse(request.params);
+      await knex("meal")
+        .update({
+          id,
+          user_id: userId.id,
+          name,
+          date_hour,
+          description,
+          is_on_the_diet,
+        })
+        .where({ id, user_id: userId.id });
+
+      return reply.status(201).send();
+    }
+  );
 }
