@@ -73,4 +73,25 @@ export async function mealRoute(app: FastifyInstance) {
       return reply.status(201).send();
     }
   );
+
+  app.delete("/:id", async (request, reply) => {
+    let session_id = request.cookies.sessionId;
+
+    const userId = await knex("user")
+      .select("id")
+      .where("session_id", session_id)
+      .first();
+
+    const getMealParamsSchema = z.object({
+      id: z.string().uuid(),
+    });
+
+    const { id } = getMealParamsSchema.parse(request.params);
+    await knex("meal").delete("*").where({
+      user_id: userId.id,
+      id,
+    });
+
+    return reply.status(201).send();
+  });
 }
