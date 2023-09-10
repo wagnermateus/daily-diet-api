@@ -139,4 +139,59 @@ export async function mealRoute(app: FastifyInstance) {
       return reply.status(201).send();
     }
   );
+
+  app.get(
+    "/metrics",
+    { preHandler: [checkSessionIdExists] },
+    async (request, reply) => {
+      let session_id = request.cookies.sessionId;
+
+      const userId = await knex("user")
+        .select("id")
+        .where("session_id", session_id)
+        .first();
+
+      const totalMeals = await knex("meal")
+        .count("* as total")
+        .where({ user_id: userId.id })
+        .first();
+
+      const totalMealsWithinTheDiet = await knex("meal")
+        .count("* as total")
+        .where({ user_id: userId.id, is_on_the_diet: true })
+        .first();
+
+      const totalOffDietMeals = await knex("meal")
+        .count("* as total")
+        .where({ user_id: userId.id, is_on_the_diet: false })
+        .first();
+
+      const meals = await knex("meal").select("*").where("user_id", userId.id);
+
+      let accumulator = 0;
+      let betterSequence = 0;
+
+      for (let i = 0; i < meals.length; i++) {
+        if (meals[i].is_on_the_diet === 1) {
+          accumulator += 1;
+        } else {
+          if (accumulator > betterSequence) {
+            betterSequence = accumulator;
+            accumulator = 0;
+          }
+        }
+      }
+      if (accumulator > betterSequence) {
+        betterSequence = accumulator;
+        accumulator = 0;
+      }
+
+      return {
+        totalMeals,
+        totalMealsWithinTheDiet,
+        totalOffDietMeals,
+        betterSequence,
+      };
+    }
+  );
 }
